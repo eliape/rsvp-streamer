@@ -1,6 +1,6 @@
 import pytest
 
-from word_streamer import StreamError, StreamOutput, WordStreamer
+from rsvp_streamer import StreamError, StreamOutput, WordStreamer
 
 
 def test_words_and_spans_round_trip():

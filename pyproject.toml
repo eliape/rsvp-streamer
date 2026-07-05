@@ -3,7 +3,7 @@ requires = ["setuptools>=77.0.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "word-streamer"
+name = "rsvp-streamer"
 version = "0.1.0"
 description = "Stream text using rapid serial visual presentation (RSVP)."
 readme = "README.md"
@@ -26,21 +26,21 @@ classifiers = [
 ]
 dependencies = []
 
-# Fill in once the project has a repository (these render on the PyPI sidebar):
-# [project.urls]
-# Homepage = "https://github.com/<owner>/word-streamer"
-# Repository = "https://github.com/<owner>/word-streamer"
-# Issues = "https://github.com/<owner>/word-streamer/issues"
+# These render on the PyPI sidebar:
+[project.urls]
+Homepage = "https://github.com/eliape/rsvp-streamer"
+Repository = "https://github.com/eliape/rsvp-streamer"
+Issues = "https://github.com/eliape/rsvp-streamer/issues"
 
 [project.optional-dependencies]
 dev = ["pytest>=7"]
 
 [project.scripts]
-word-streamer = "word_streamer.demo:main"
+rsvp-streamer = "rsvp_streamer.demo:main"
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["word_streamer*"]
+include = ["rsvp_streamer*"]
 
 [tool.pytest.ini_options]
 pythonpath = ["."]

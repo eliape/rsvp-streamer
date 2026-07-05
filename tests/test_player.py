@@ -3,7 +3,7 @@ import time
 
 import pytest
 
-from word_streamer import StreamError, StreamPlayer, WordStreamer
+from rsvp_streamer import StreamError, StreamPlayer, WordStreamer
 
 SENTENCE = "one two three four five"
 WORDS = SENTENCE.split()

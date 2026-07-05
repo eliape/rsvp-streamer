@@ -1,7 +1,7 @@
 """Runnable demo: RSVP-stream a sentence with the ORP pinned in place.
 
 Run it directly (e.g. the IDE "Run" button) or as a module:
-    python -m word_streamer.demo
+    python -m rsvp_streamer.demo
 """
 
 if __package__ in (None, ""):
@@ -12,7 +12,7 @@ if __package__ in (None, ""):
     import sys
 
     sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-    from word_streamer import StreamOutput, WordStreamer
+    from rsvp_streamer import StreamOutput, WordStreamer
 else:
     from . import StreamOutput, WordStreamer
 

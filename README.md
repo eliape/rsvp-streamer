@@ -1,10 +1,10 @@
-# WordStreamer
+# RSVP Streamer
 
 A small Python library for **rapid serial visual presentation (RSVP)** — displaying text one
 word at a time, in a fixed spot, so the reader never has to move their eyes. It's the technique
 behind speed-reading apps like Spritz.
 
-WordStreamer separates *what word comes next* from *when to show it*:
+`rsvp-streamer` separates *what word comes next* from *when to show it*:
 
 - **`WordStreamer`** — a timeless iterator that tokenises text and yields one `StreamOutput` per
   word. It has no notion of a clock, which keeps the word logic simple and testable.
@@ -20,7 +20,9 @@ WordStreamer separates *what word comes next* from *when to show it*:
 From source (not yet on PyPI):
 
 ```bash
-pip install -e .          # installs the package + the `word-streamer` demo command
+git clone https://github.com/eliape/rsvp-streamer.git
+cd rsvp-streamer
+pip install -e .          # installs the package + the `rsvp-streamer` demo command
 pip install -r requirements.txt   # test dependencies (pytest)
 ```
 
@@ -31,7 +33,7 @@ pip install -r requirements.txt   # test dependencies (pytest)
 Each iteration yields a `StreamOutput` describing one word:
 
 ```python
-from word_streamer import WordStreamer
+from rsvp_streamer import WordStreamer
 
 streamer = WordStreamer(source="Reading one word at a time.", rate=300)
 
@@ -50,7 +52,7 @@ You can also drive it manually with `step()` (returns `None` when exhausted) and
 each word. It returns the running player so you can control it:
 
 ```python
-from word_streamer import WordStreamer
+from rsvp_streamer import WordStreamer
 
 streamer = WordStreamer(source="Reading one word at a time.", rate=300)
 
@@ -64,10 +66,10 @@ player.join()           # block until the whole source has streamed
 > your UI thread if needed. An exception raised in `on_word` aborts playback and is re-raised by
 > `join()` (also readable via `player.error`). Calling `player.stop()` from inside `on_word` is safe.
 
-A complete terminal example lives in [`word_streamer/demo.py`](word_streamer/demo.py); run it with:
+A complete terminal example lives in [`rsvp_streamer/demo.py`](rsvp_streamer/demo.py); run it with:
 
 ```bash
-python -m word_streamer.demo
+python -m rsvp_streamer.demo
 ```
 
 ## Concepts
