@@ -139,7 +139,7 @@ class StreamPlayer:
 
     @property
     def progress(self) -> float:
-        """Fraction of the stream played, ``0.0``–``1.0``.
+        """Fraction of the stream played, ``0.0``-``1.0``.
 
         An empty stream reports ``1.0`` (vacuously complete). Useful for
         driving progress bars from the calling thread during playback.
