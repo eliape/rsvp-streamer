@@ -1,8 +1,6 @@
 # RSVP Streamer
 
-A small Python library for **rapid serial visual presentation (RSVP)** — displaying text one
-word at a time, in a fixed spot, so the reader never has to move their eyes. It's the technique
-behind speed-reading apps like Spritz.
+A small Python library for **rapid serial visual presentation (RSVP)**, a speed-reading technique displaying text one word at a time, in a fixed spot, so the reader never has to move their eyes.
 
 `rsvp-streamer` separates *what word comes next* from *when to show it*:
 
@@ -62,8 +60,7 @@ player.resume()
 player.join()           # block until the whole source has streamed
 ```
 
-> The `on_word` callback runs on the player's worker thread — keep it quick, and marshal back to
-> your UI thread if needed. An exception raised in `on_word` aborts playback and is re-raised by
+> The `on_word` callback runs on the player's worker thread. An exception raised in `on_word` aborts playback and is re-raised by
 > `join()` (also readable via `player.error`). Calling `player.stop()` from inside `on_word` is safe.
 
 A complete terminal example lives in [`rsvp_streamer/demo.py`](rsvp_streamer/demo.py); run it with:
@@ -77,16 +74,16 @@ python -m rsvp_streamer.demo
 ### Rate and interval
 
 `rate` is in **words per minute (WPM)**; `interval` is the derived seconds-per-word
-(`60 / rate`). Both are validated — a non-positive rate raises `StreamError`.
+(`60 / rate`). Both are validated and a non-positive rate raises `StreamError`.
 
 By default every word dwells for the flat `interval`. Pass `delay_for=` to `play()` or
-`StreamPlayer` to vary the dwell per word — a `(StreamOutput, base_interval) -> float`
+`StreamPlayer` to vary the dwell per word, a `(StreamOutput, base_interval) -> float`
 callable returning seconds, where `base_interval` is the current `interval` (so runtime
 rate changes still apply).
 
-The built-in [`Cadence`](rsvp_streamer/cadence.py) preset does the natural thing —
-slowing on long words and pausing at clause, sentence, and paragraph breaks — driven by a
-plain dict of multipliers on the base interval:
+The built-in [`Cadence`](rsvp_streamer/cadence.py) preset 
+decreases the rate on long words and pauses at clause, sentence, and paragraph breaks. It's driven by a
+plain dictionary of multipliers on the base interval:
 
 ```python
 from rsvp_streamer import Cadence
@@ -98,7 +95,7 @@ player = streamer.play(on_word=show, delay_for=Cadence())
 player = streamer.play(on_word=show, delay_for=Cadence(multipliers={"paragraph": 4.0}))
 ```
 
-Or supply your own strategy — the multipliers compose multiplicatively:
+You can also supply your own strategy. The multipliers compose multiplicatively:
 
 ```python
 def dwell(out, base):
