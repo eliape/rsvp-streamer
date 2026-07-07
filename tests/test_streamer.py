@@ -21,6 +21,18 @@ def test_blank_source_is_empty_stream(text):
     assert list(WordStreamer(source=text)) == []
 
 
+def test_trailing_whitespace_is_captured():
+    # trailing is the whitespace run up to the next word (or end of source).
+    src = "one two\nthree\n\nfour  "
+    outs = list(WordStreamer(source=src))
+    assert [(o.text, o.trailing) for o in outs] == [
+        ("one", " "),
+        ("two", "\n"),
+        ("three", "\n\n"),
+        ("four", "  "),          # trailing whitespace after the final word
+    ]
+
+
 def test_len_is_word_count():
     assert len(WordStreamer(source="one two three")) == 3
 
@@ -59,12 +71,27 @@ def test_generate_output_shape():
     assert out == StreamOutput.from_span("hello", 1, 0)
 
 
-def test_orp_counts_trailing_punctuation():
-    # Documents the known simplification: punctuation counts toward word
-    # length, so "text." (len 5) pivots at 1 like any 5-character word.
-    out = WordStreamer(source="text.").step()
+def test_orp_ignores_trailing_punctuation():
+    # "hello," is 6 chars, but the pivot comes from the 5-letter core —
+    # same ORP as bare "hello", so the pinned column does not jitter.
+    # char_len still counts the punctuation.
+    out = WordStreamer(source="hello,").step()
     assert out.center_index == 1
-    assert out.char_len == 5
+    assert out.char_len == 6
+
+
+def test_orp_skips_leading_punctuation():
+    # Core "hello" starts at index 1; its pivot (1) lands at index 2 overall,
+    # so the fixated character is still the word's second letter.
+    out = WordStreamer(source='"hello').step()
+    assert out.center_index == 2
+    assert out.text[out.center_index] == "e"
+
+
+def test_orp_all_punctuation_falls_back_to_raw_word():
+    # No alphanumeric core: pivot on the raw length ("..." len 3 -> index 1).
+    out = WordStreamer(source="...").step()
+    assert out.center_index == 1
 
 
 @pytest.mark.parametrize("rate,interval", [(300, 0.2), (600, 0.1)])

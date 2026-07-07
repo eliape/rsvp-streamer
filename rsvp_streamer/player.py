@@ -33,6 +33,14 @@ class StreamPlayer:
             :meth:`join` (and available via :attr:`error`).
         on_finish: Optional callback invoked once when playback ends, whether
             the stream was exhausted, aborted, or :meth:`stop` was called.
+        delay_for: Optional ``(StreamOutput, base_interval) -> float`` strategy
+            returning the dwell in seconds after each word, where
+            ``base_interval`` is the current ``streamer.interval`` (so runtime
+            rate changes still apply). Defaults to that flat interval; pass
+            :class:`~rsvp_streamer.cadence.Cadence` (or your own callable) to
+            dwell longer on long words or at punctuation/line breaks. Runs on
+            the worker thread — an exception here aborts playback like an
+            ``on_word`` error.
     """
 
     def __init__(
@@ -41,16 +49,19 @@ class StreamPlayer:
         on_word: Callable[[StreamOutput], None],
         *,
         on_finish: Optional[Callable[[], None]] = None,
+        delay_for: Optional[Callable[[StreamOutput, float], float]] = None,
     ):
         self._streamer = streamer
         self._on_word = on_word
         self._on_finish = on_finish
+        self._delay_for = delay_for
 
         self._thread: Optional[threading.Thread] = None
         self._stop = threading.Event()      # set -> worker should exit
         self._resumed = threading.Event()   # set -> playing, clear -> paused
         self._done = threading.Event()      # set -> worker has exited
         self._error: Optional[Exception] = None  # exception that aborted playback
+        self._words_played = 0  # words emitted in the current run
 
     # --- controls ---
 
@@ -60,6 +71,7 @@ class StreamPlayer:
             raise StreamError("player is already running")
         self._streamer.reset()
         self._error = None
+        self._words_played = 0
         self._stop.clear()
         self._resumed.set()
         self._done.clear()
@@ -120,6 +132,21 @@ class StreamPlayer:
         """Exception that aborted playback, if any; otherwise ``None``."""
         return self._error
 
+    @property
+    def words_played(self) -> int:
+        """Words emitted so far in the current run (counts the one in ``on_word``)."""
+        return self._words_played
+
+    @property
+    def progress(self) -> float:
+        """Fraction of the stream played, ``0.0``–``1.0``.
+
+        An empty stream reports ``1.0`` (vacuously complete). Useful for
+        driving progress bars from the calling thread during playback.
+        """
+        total = len(self._streamer)
+        return 1.0 if total == 0 else self._words_played / total
+
     # --- worker ---
 
     def _run(self) -> None:
@@ -132,9 +159,12 @@ class StreamPlayer:
                     out = self._streamer.step()
                     if out is None:               # stream exhausted
                         break
+                    self._words_played += 1
                     self._on_word(out)
+                    base = self._streamer.interval
+                    delay = base if self._delay_for is None else self._delay_for(out, base)
                     # Interruptible delay: returns True the instant stop() fires.
-                    if self._stop.wait(self._streamer.interval):
+                    if self._stop.wait(delay):
                         break
             except Exception as exc:              # a callback/streamer error aborts playback
                 self._error = exc

@@ -3,7 +3,7 @@ import time
 
 import pytest
 
-from rsvp_streamer import StreamError, StreamPlayer, WordStreamer
+from rsvp_streamer import Cadence, StreamError, StreamPlayer, WordStreamer
 
 SENTENCE = "one two three four five"
 WORDS = SENTENCE.split()
@@ -202,3 +202,120 @@ def test_stop_from_within_on_word_does_not_deadlock():
     assert player.join(timeout=5)       # must not hang or raise
     assert not player.is_alive
     assert seen == ["one"]
+
+
+def test_delay_for_overrides_interval_and_sees_each_word():
+    # rate=SLOW means 10s/word if the flat interval were used — join(5) would
+    # time out. Finishing proves delay_for's return value drives the pacing.
+    rec = Recorder()
+    seen = []
+
+    def delay_for(out, base):
+        seen.append(out.text)
+        return 0.0                      # no dwell: finish immediately
+
+    player = StreamPlayer(WordStreamer(SENTENCE, rate=SLOW), rec.on_word, delay_for=delay_for)
+    player.start()
+    assert player.join(timeout=5), "delay_for pacing was not used"
+    assert rec.words == WORDS
+    assert seen == WORDS                # called once per word, in order
+
+
+def test_delay_for_receives_current_base_interval():
+    # The base arg must be streamer.interval, tracking runtime rate changes.
+    seen = []
+    player = StreamPlayer(
+        WordStreamer(SENTENCE, rate=SLOW),
+        lambda out: None,
+        delay_for=lambda out, base: (seen.append(base), 0.0)[1],
+    )
+    player.start()
+    assert player.join(timeout=5)
+    assert seen and all(b == pytest.approx(60.0 / SLOW) for b in seen)
+
+
+def test_play_passes_delay_for_through():
+    rec = Recorder()
+    player = WordStreamer(SENTENCE, rate=SLOW).play(rec.on_word, delay_for=lambda out, base: 0.0)
+    try:
+        assert player.join(timeout=5), "delay_for was not forwarded by play()"
+        assert rec.words == WORDS
+    finally:
+        player.stop()
+
+
+def test_stop_interrupts_delay_for_dwell():
+    # A huge custom dwell must be as interruptible as the flat interval.
+    rec = Recorder()
+    player = StreamPlayer(
+        WordStreamer(SENTENCE, rate=FAST), rec.on_word, delay_for=lambda out, base: 10.0
+    )
+    player.start()
+    assert wait_until(lambda: rec.count() >= 1), "no first word"
+    player.stop()                       # must cut through the 10s dwell instantly
+
+    assert not player.is_alive
+    assert rec.count() < len(WORDS)
+
+
+def test_delay_for_error_is_surfaced_via_join():
+    boom = RuntimeError("bad delay")
+
+    def delay_for(out, base):
+        raise boom
+
+    player = StreamPlayer(WordStreamer(SENTENCE, rate=FAST), lambda out: None, delay_for=delay_for)
+    player.start()
+
+    with pytest.raises(RuntimeError, match="bad delay"):
+        player.join(timeout=5)
+    assert player.error is boom
+    assert not player.is_alive
+
+
+def test_progress_tracks_words_played():
+    rv = Rendezvous()
+    player = StreamPlayer(WordStreamer(SENTENCE, rate=FAST), rv.on_word)
+
+    assert player.words_played == 0
+    assert player.progress == 0.0
+
+    player.start()
+    assert rv.next_word() == "one"      # worker blocked inside on_word
+    assert player.words_played == 1     # counts the word currently in on_word
+    assert player.progress == pytest.approx(1 / len(WORDS))
+    rv.allow()
+
+    for expected in WORDS[1:]:
+        assert rv.next_word() == expected
+        rv.allow()
+    assert player.join(timeout=2)
+    assert player.words_played == len(WORDS)
+    assert player.progress == 1.0
+
+
+def test_progress_resets_on_restart():
+    rec = Recorder()
+    player = StreamPlayer(WordStreamer(SENTENCE, rate=FAST), rec.on_word)
+
+    player.start()
+    assert player.join(timeout=5)
+    assert player.progress == 1.0
+
+    rec.reset()
+    player.start()                      # a restart counts afresh...
+    assert player.join(timeout=5)
+    assert player.words_played == len(WORDS)  # ...not accumulated to 2x
+    assert player.progress == 1.0
+
+
+def test_cadence_preset_drives_playback_end_to_end():
+    # Cadence is a valid delay_for: at FAST the base is tiny, so even the
+    # paragraph multiplier keeps the run in milliseconds. Proves wiring works
+    # across word-length, punctuation, and newline cases in one source.
+    rec = Recorder()
+    streamer = WordStreamer("presentation streams words.\n\nNext paragraph here.", rate=FAST)
+    player = StreamPlayer(streamer, rec.on_word, delay_for=Cadence())
+    player.start()
+    assert player.join(timeout=5), "Cadence-paced playback did not finish"
+    assert rec.words == ["presentation", "streams", "words.", "Next", "paragraph", "here."]

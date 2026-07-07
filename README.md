@@ -79,6 +79,40 @@ python -m rsvp_streamer.demo
 `rate` is in **words per minute (WPM)**; `interval` is the derived seconds-per-word
 (`60 / rate`). Both are validated — a non-positive rate raises `StreamError`.
 
+By default every word dwells for the flat `interval`. Pass `delay_for=` to `play()` or
+`StreamPlayer` to vary the dwell per word — a `(StreamOutput, base_interval) -> float`
+callable returning seconds, where `base_interval` is the current `interval` (so runtime
+rate changes still apply).
+
+The built-in [`Cadence`](rsvp_streamer/cadence.py) preset does the natural thing —
+slowing on long words and pausing at clause, sentence, and paragraph breaks — driven by a
+plain dict of multipliers on the base interval:
+
+```python
+from rsvp_streamer import Cadence
+
+# defaults slow long words 1.5x, sentences 2x, paragraphs 2.5x, ...
+player = streamer.play(on_word=show, delay_for=Cadence())
+
+# tweak just what you want; the rest stay at their defaults
+player = streamer.play(on_word=show, delay_for=Cadence(multipliers={"paragraph": 4.0}))
+```
+
+Or supply your own strategy — the multipliers compose multiplicatively:
+
+```python
+def dwell(out, base):
+    if out.text.endswith((".", "!", "?")):
+        return base * 2.0           # let sentences land
+    return base * (1.5 if out.char_len > 9 else 1.0)
+
+player = streamer.play(on_word=show, delay_for=dwell)
+```
+
+`Cadence` keys off the word's last character (punctuation), its `char_len` (long words),
+and `out.trailing` — the whitespace after the word — to detect line (`\n`) and paragraph
+(`\n\n`) breaks, which plain whitespace tokenisation would otherwise discard.
+
 ### `StreamOutput`
 
 An immutable value object emitted per word:
@@ -89,6 +123,7 @@ An immutable value object emitted per word:
 | `center_index` | Index of the **optimal recognition point (ORP)** — the pivot to fixate on.|
 | `indices`      | `(start, end)` span of the word in the source (`source[start:end] == text`). |
 | `char_len`     | `len(text)`.                                                              |
+| `trailing`     | Whitespace that followed the word (`" "`, `"\n"`, `"\n\n"`, …) — for line/paragraph pauses. |
 
 The ORP is where the eye should rest for fastest recognition — slightly left of centre. Pinning
 that character to a fixed column (as the demo does) is what makes RSVP comfortable to read.
@@ -100,15 +135,17 @@ WordStreamer(source="", rate=300)
     .rate / .source / .interval        configurable properties (validated)
     iter(s) / next(s) / s.step()       yield StreamOutput, or None at the end
     .reset()                           rewind to the first word
-    .play(on_word, on_finish=None)     start a StreamPlayer, return it
+    .play(on_word, on_finish=None, delay_for=None)   start a StreamPlayer, return it
 
-StreamPlayer(streamer, on_word, on_finish=None)
+StreamPlayer(streamer, on_word, on_finish=None, delay_for=None)
     .start() / .pause() / .resume() / .stop()
     .join(timeout=None) -> bool        block until finished; re-raises a callback error
     .is_alive / .is_paused / .is_playing
+    .words_played / .progress          position in the stream (for progress bars)
     .error                             exception that aborted playback, or None
 
-StreamOutput(text, center_index, indices, char_len)
+StreamOutput(text, center_index, indices, char_len, trailing="")
+Cadence(long_word_len=9, multipliers=DEFAULT_MULTIPLIERS)   delay_for(out, base) preset
 StreamError                            invalid configuration or player state
 ```
 
@@ -125,7 +162,10 @@ wall-clock sleeps) — see the notes in `CLAUDE.md`.
 
 Early-stage (v0.1). Known simplifications:
 
-- Tokenisation splits on whitespace, so trailing punctuation stays attached to a word and counts
-  toward its length (and thus its ORP).
+- Tokenisation splits on whitespace, so punctuation stays attached to a word and counts toward
+  `char_len` (the ORP, however, is computed on the word's alphanumeric core, so it isn't skewed).
 - The ORP uses a coarse length-based pivot table rather than a linguistic model.
 - `source` is a single in-memory string; there is no streaming-from-file source yet.
+
+Planned improvements (and what's deliberately out of scope) are tracked in
+[ROADMAP.md](ROADMAP.md).

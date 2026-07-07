@@ -14,15 +14,22 @@ class StreamOutput:
         indices: ``(start, end)`` span of the word within the source text,
             with ``end`` exclusive (``source[start:end] == text``).
         char_len: Number of characters in ``text``.
+        trailing: The whitespace run that followed the word in the source
+            (``""``, ``" "``, ``"\\n"``, ``"\\n\\n"``, …). Lets a pacer or
+            renderer react to line and paragraph breaks that tokenisation
+            otherwise discards. ``""`` for the final word if nothing follows.
     """
 
     text: str
     center_index: int
     indices: tuple[int, int]
     char_len: int
+    trailing: str = ""
 
     @classmethod
-    def from_span(cls, text: str, center_index: int, start: int) -> "StreamOutput":
+    def from_span(
+        cls, text: str, center_index: int, start: int, trailing: str = ""
+    ) -> "StreamOutput":
         """Build an output from a word, its ORP index, and its start offset.
 
         ``char_len`` and the end of ``indices`` are derived from ``text`` so
@@ -33,4 +40,5 @@ class StreamOutput:
             center_index=center_index,
             indices=(start, start + len(text)),
             char_len=len(text),
+            trailing=trailing,
         )
