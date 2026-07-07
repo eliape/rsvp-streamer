@@ -2,6 +2,9 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Rules
+- Do not use "-–" (em dash) in comments, docstrings, READMEs or ROADMAPs or any other documentation.
+
 ## Commands
 
 Everything runs from the repo root (flat package layout; imports resolve via
